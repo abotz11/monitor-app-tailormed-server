@@ -105,31 +105,47 @@ async function InitializeAssistanceProgramAsync(programName, link) {
 
 async function UpdateAssistanceProgramAsync(callback) {
   //get all the names from db
-  const programNames = await dl.GetManyAsync(null, "programName", callback);
-  let assistanceProgramsToUpdate = [];
+  await dl.GetManyAsync(null, "programName", async (programs) => {
+    let assistanceProgramsToUpdate = [];
 
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  await page.goto("https://www.healthwellfoundation.org/disease-funds");
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    await page.goto("https://www.healthwellfoundation.org/disease-funds");
 
-  //open closed programs
-  await page.waitForSelector("div > .subsection > .filters > .closed > a");
-  await page.click("div > .subsection > .filters > .closed > a");
+    //open closed programs
+    await page.waitForSelector("div > .subsection > .filters > .closed > a");
+    await page.click("div > .subsection > .filters > .closed > a");
 
-  for (let programName in programNames) {
-    //find their href
-    let link = Array.from(document.querySelectorAll("li > a")).find(
-      (el) => el.textContent === programName
-    )["href"];
+    let [ulElements] = await page.$$("div > .subsection > .funds");
+    const items = await ulElements.$x("li");
+    const textItemsAndLinks = [];
+    for (item of items) {
+      const listTxt = await item.getProperty("textContent");
+      let programName = await listTxt.jsonValue();
 
-    assistanceProgramsToUpdate.push(
-      await InitializeAssistanceProgramAsync(programName, link)
-    );
-  }
+      const [aTag] = await item.$x("a");
+      const linkTxt = await aTag.getProperty("href");
+      link = await linkTxt.jsonValue();
 
-  await dl.UpdateManyAsync(assistanceProgramsToUpdate, callback);
+      textItemsAndLinks.push({ programName: programName, link: link });
+    }
 
-  await browser.close();
+    for (let program of programs) {
+      let foundProgram = textItemsAndLinks.find(
+        (el) => el.programName == program.programName
+      );
+
+      assistanceProgramsToUpdate.push(
+        await InitializeAssistanceProgramAsync(
+          foundProgram.programName,
+          foundProgram.link
+        )
+      );
+    }
+    await dl.UpdateManyAsync(assistanceProgramsToUpdate, callback);
+
+    await browser.close();
+  });
 }
 
 async function UpdateAssistanceProgramManuallyAsync(callback) {
@@ -140,7 +156,7 @@ async function UpdateAssistanceProgramManuallyAsync(callback) {
   await dl.GetManyAsync(null, "programName", (programs) => {
     console.log(`programNames: ${programs}`);
 
-    for (let program in programs) {
+    for (let program of programs) {
       newProgram = {
         programName: program.programName,
         treatmentList: [],
@@ -153,7 +169,7 @@ async function UpdateAssistanceProgramManuallyAsync(callback) {
   });
 
   console.log(`assistanceProgramsToUpdate: ${assistanceProgramsToUpdate}`);
-  callback(await dl.UpdateManyAsync(assistanceProgramsToUpdate));
+  await dl.UpdateManyAsync(assistanceProgramsToUpdate, callback);
 }
 
 async function GetAllAssistanceProgramsAsync(callback) {

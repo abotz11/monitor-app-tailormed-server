@@ -30,7 +30,10 @@ async function InsertManyAsync(programs) {
 async function UpdateManyAsync(programs) {
   console.log(`UpdateManyAsync Started, programs: ${programs}`);
   for (let program of programs) {
-    await AssistanceProgram.updateOne({ programName: program.programName })
+    await AssistanceProgram.updateOne(
+      { programName: program.programName },
+      { ...program }
+    )
       .exec()
       .then((result) => {
         console.log(`UpdateManyAsync - result: ${result}`);
