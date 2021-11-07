@@ -15,7 +15,7 @@ app.get("/", (req, res) => {
 
 app.get("/update", (req, res) => {
   console.log(`Method: Get, route: /update`);
-  bl.UpdateAssistanceProgramManuallyAsync((result) => {
+  bl.UpdateAssistanceProgramAsync((result) => {
     res.send(result);
   });
 });
